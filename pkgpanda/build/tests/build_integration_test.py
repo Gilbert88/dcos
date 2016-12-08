@@ -97,8 +97,6 @@ def test_bootstrap(tmpdir):
     pkg_dir = tmpdir.join("bootstrap_test")
     copytree("resources/", str(pkg_dir))
     with pkg_dir.as_cwd():
-        treeinfo = {'variants': {'variant': 'downstream'}}
-        pkg_dir.join("treeinfo.json").write(json.dumps(treeinfo), ensure=True)
         check_call(["mkpanda", "tree", "--mkbootstrap"])
         cache_dir = str(pkg_dir.join("cache/bootstrap")) + "/"
         bootstrap_id = open(cache_dir + "bootstrap.latest", 'r').read().strip()
@@ -140,6 +138,7 @@ def test_bootstrap(tmpdir):
             './active/url_extract-tar',
             './active/url_extract-zip',
             './active/variant',
+            './active/variant-dep',
             './active/single_source',
             './active/single_source_extra',
             './bin/',
@@ -157,6 +156,7 @@ def test_bootstrap(tmpdir):
             'single_source': {'pkginfo.json', 'buildinfo.full.json'},
             'single_source_extra': {'pkginfo.json', 'buildinfo.full.json'},
             'variant': {'pkginfo.json', 'buildinfo.full.json'},
+            'variant-dep': {'pkginfo.json', 'buildinfo.full.json'},
             'base': {
                 'base',
                 'bin/',
