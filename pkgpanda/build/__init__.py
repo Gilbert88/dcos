@@ -207,7 +207,19 @@ class PackageSet:
                 if require_tuple not in package_tuples:
                     to_visit.append(require_tuple)
                     package_tuples.add(require_tuple)
-        return package_tuples
+
+        package_tuples_with_variant_overrides = set()
+        for pkg_name, pkg_variant in package_tuples:
+            variant_override = treeinfo.variants.get(pkg_name)
+            if variant_override is None or variant_override == pkg_variant:
+                package_tuples_with_variant_overrides.add((pkg_name, pkg_variant))
+            else:
+                print("package '{pkg_name}' variant '{pkg_variant}' will be overridden to variant '{variant_override}' "
+                      "specified in treeinfo".format(pkg_name=pkg_name, pkg_variant=pkg_variant,
+                                                     variant_override=variant_override))
+                package_tuples_with_variant_overrides.add((pkg_name, variant_override))
+
+        return package_tuples_with_variant_overrides
 
     @staticmethod
     def validate_package_tuples(package_tuples, treeinfo, package_store):
@@ -733,6 +745,7 @@ def build_tree(package_store, mkbootstrap, tree_variant):
     # Build bootstrap tarballs for all tree variants.
     def make_bootstrap(package_set):
         with logger.scope("Making bootstrap variant: {}".format(pkgpanda.util.variant_name(package_set.variant))):
+            print("Packages to be included in bootstrap: {}".format(package_set.bootstrap_packages))
             package_paths = list()
             for name, pkg_variant in package_set.bootstrap_packages:
                 package_paths.append(built_packages[name][pkg_variant])

@@ -1,24 +1,37 @@
 #!/bin/bash
 
-mkdir -p "/build"
-mkdir -p "$PKG_PATH/etc"
+mkdir -p ${PKG_PATH}/bin
+mkdir -p ${PKG_PATH}/lib
 
-# TODO(cmaloney): Fix the rpath
-pushd "/pkg/src/openssl"
-./Configure "--prefix=$PKG_PATH" \
-  --openssldir="$PKG_PATH/etc/ssl" \
-  shared \
-  zlib \
-  no-krb5 \
-  linux-x86_64 \
-  -Wa,--noexecstack \
-  -O2 -DFORTIFY_SOURCE=2
+cp -r /bin/openssl                      ${PKG_PATH}/bin/
+cp -r /usr/lib64/libcrypto.so.1.0.1e    ${PKG_PATH}/lib/
+cp -r /usr/lib64/libssl.so.1.0.1e       ${PKG_PATH}/lib/
+cp -r /usr/lib64/openssl/engines        ${PKG_PATH}/lib/engines
 
-make depend
-make
-make install
+pushd ${PKG_PATH}/lib
+ln -s libcrypto.so.1.0.1e    libcrypto.so
+ln -s libcrypto.so.1.0.1e    libcrypto.so.10
+ln -s libssl.so.1.0.1e       libssl.so
+ln -s libssl.so.1.0.1e       libssl.so.10
+popd
 
-# TODO(cmaloney): This sort of stripping static libraries should be a generic
-# mkpanda option to apply to any package.
-find "$PKG_PATH/lib/" ! -type d -name "*.a" -delete
-find "$PKG_PATH/etc/ssl/man/" -delete
+## headers
+mkdir -p ${PKG_PATH}/etc/ssl
+mkdir -p ${PKG_PATH}/include
+mkdir -p ${PKG_PATH}/lib/pkgconfig
+
+cp -r /usr/include/openssl              ${PKG_PATH}/include/openssl
+cp -r /usr/lib64/pkgconfig/libcrypto.pc ${PKG_PATH}/lib/pkgconfig/
+cp -r /usr/lib64/pkgconfig/libssl.pc    ${PKG_PATH}/lib/pkgconfig/
+cp -r /usr/lib64/pkgconfig/openssl.pc   ${PKG_PATH}/lib/pkgconfig/
+
+cp -r /etc/pki/tls/openssl.cnf          ${PKG_PATH}/etc/ssl/
+cp -r /etc/pki/tls/private              ${PKG_PATH}/etc/ssl/
+cp -r /etc/pki/tls/misc                 ${PKG_PATH}/etc/ssl/misc
+
+## centos has kerberos built into it's openssl...
+cp -r /usr/include/krb5.h              ${PKG_PATH}/include/
+cp -r /usr/include/krb5                ${PKG_PATH}/include/
+
+cp -r /usr/include/et                  ${PKG_PATH}/include/
+cp -r /usr/include/com_err.h           ${PKG_PATH}/include/

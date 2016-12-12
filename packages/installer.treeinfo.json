@@ -2,5 +2,8 @@
   "core_package_list": [
     "dcos-image",
     "dcos-installer-ui"
-  ]
+  ],
+  "variants": {
+    "openssl": "symlink"
+  }
 }
