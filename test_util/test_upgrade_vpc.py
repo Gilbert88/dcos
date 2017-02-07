@@ -73,6 +73,17 @@ def cluster_workload(cluster_api):
         tasks = response.json()['tasks']
         return [task['id'] for task in tasks]
 
+    def get_master_task_state(task_id):
+        """Returns the JSON blob associated with the task from /master/state."""
+        r = cluster_api.get('/mesos/master/state')
+        r.raise_for_status()
+        master_state = r.json()
+
+        for framework in master_state['frameworks']:
+            for task in framework['tasks']:
+                if task_id in task['id']:
+                    return task
+
     def parse_dns_log(dns_log_content):
         """Return a list of (timestamp, status) tuples from dns_log_content."""
         dns_log = [line.strip().split(' ') for line in dns_log_content.strip().split('\n')]
@@ -179,6 +190,13 @@ done
     tasks_start = {app_id: sorted(app_task_ids(app_id)) for app_id in test_app_ids}
     log.debug('Test app tasks at start:\n' + pprint.pformat(tasks_start))
 
+    # Save the master's state of the task to compare with
+    # the master's view after the upgrade.
+    # See this issue for why we check for a difference:
+    # https://issues.apache.org/jira/browse/MESOS-1718
+    task_state_start = get_master_task_state(tasks_start[0])
+    log.debug('Test app state at start:\n' + pprint.pformat(task_state_start))
+
     for app in test_apps:
         assert app['instances'] == len(tasks_start[app['id']])
 
@@ -192,6 +210,12 @@ done
 
     # Verify that the tasks we started are still running.
     assert tasks_start == tasks_end
+
+    task_state_end = get_master_task_state(tasks_start[0])
+    log.debug('Test app state at end:\n' + pprint.pformat(task_state_end))
+
+    # Verify that the Master's info about the task did not change.
+    assert task_state_start == task_state_end
 
     # Verify DNS didn't fail.
     marathon_framework_id = cluster_api.marathon.get('/v2/info').json()['frameworkId']
