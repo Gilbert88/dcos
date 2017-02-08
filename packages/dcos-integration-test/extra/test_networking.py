@@ -1,4 +1,4 @@
-import concurrent
+import concurrent.futures
 import contextlib
 import json
 import logging
