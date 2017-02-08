@@ -39,7 +39,7 @@ def ensure_routable(cmd, service_points):
 
 
 class VipTest:
-    def __init__(self, container, num, vip, vipaddr, samehost, vipnet, proxynet):
+    def __init__(self, num, container, vip, vipaddr, samehost, vipnet, proxynet):
         self.vip = vip.format(num, 7000 + num)
         self.container = container
         self.vipaddr = vipaddr.format(num, 7000 + num)
@@ -150,22 +150,16 @@ def test_vip(dcos_api_session, reduce_logging):
     """
     addrs = [['1.1.1.{}:{}', '1.1.1.{}:{}'],
              ['/namedvip{}:{}', 'namedvip{}.marathon.l4lb.thisdcos.directory:{}']]
-    # docker tests
-    permutations = [[vi, va, sh, vn, pn]
+    # tests
+    # UCR doesn't support BRIDGE mode
+    permutations = [[c, vi, va, sh, vn, pn]
+                    for c in ['UCR', 'DOCKER']
                     for [vi, va] in addrs
                     for sh in [True, False]
                     for vn in ['USER', 'BRIDGE', 'HOST']
-                    for pn in ['USER', 'BRIDGE', 'HOST']]
-    docker_tests = [VipTest('DOCKER', i, vi, va, sh, vn, pn) for i, [vi, va, sh, vn, pn] in enumerate(permutations)]
-    # ucr tests
-    permutations = [[vi, va, sh, vn, pn]
-                    for [vi, va] in addrs
-                    for sh in [True, False]
-                    for vn in ['USER', 'HOST']
-                    for pn in ['USER', 'HOST']]
-    ucr_tests = [VipTest('UCR', i, vi, va, sh, vn, pn) for i, [vi, va, sh, vn, pn] in enumerate(permutations)]
-    tests = ucr_tests + docker_tests
-
+                    for pn in ['USER', 'BRIDGE', 'HOST']
+                    if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
+    tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
     executor = concurrent.futures.ThreadPoolExecutor(workers=maxthreads)
     # deque is thread safe
     failed_tests = deque(tests)
@@ -183,13 +177,11 @@ def test_vip(dcos_api_session, reduce_logging):
         passed_tests.append(test)
 
     tasks = [executor.submit(run, t) for t in failed_tests]
-
     for t in concurrent.futures.as_completed(tasks):
         try:
             t.result()
         except Exception as exc:
             log.info('vip_test generated an exception: {}'.format(exc))
-
     [r.log('PASSED', lvl=logging.INFO) for r in passed_tests]
     [r.log('SKIPPED', lvl=logging.INFO) for r in skipped_tests]
     [r.log('FAILED', lvl=logging.INFO) for r in failed_tests]
