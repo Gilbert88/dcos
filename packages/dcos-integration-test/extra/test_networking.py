@@ -196,7 +196,7 @@ def test_vip(dcos_api_session, reduce_logging):
                     if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
     tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
     # user networks do not work yet
-    tests = [t for t in tests if t.container is not 'UCR' or (t.vipnet is not 'USER' and t.proxynet is not 'USER']
+    tests = [t for t in tests if t.container is not 'UCR' or (t.vipnet is not 'USER' and t.proxynet is not 'USER')]
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=maxthreads)
     # deque is thread safe
     failed_tests = deque(tests)
