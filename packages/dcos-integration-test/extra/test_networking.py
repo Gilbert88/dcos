@@ -60,6 +60,7 @@ class VipTest:
 
 def docker_vip_app(network, host, vip):
     app, uuid = get_test_app_in_docker()
+    app['id'] = '/viptest' + app['id']
     app['container']['docker']['network'] = network
 
     app['mem'] = 16
@@ -83,17 +84,9 @@ def docker_vip_app(network, host, vip):
 
 def ucr_vip_app(network, host, vip):
     app, uuid = get_test_app_in_ucr()
+    app['id'] = '/viptest' + app['id']
     app['mem'] = 16
     app['cpu'] = 0.01
-    app["ipAddress"] = {
-        "discovery": {
-            "ports": [{
-                "protocol": "tcp",
-                "name": "test",
-                "number": 80,
-            }]
-        }
-    }
     app['healthChecks'] = [{
         'protocol': 'MESOS_HTTP',
         'path': '/ping',
@@ -104,6 +97,15 @@ def ucr_vip_app(network, host, vip):
     }]
     assert network is not 'BRIDGE'
     if network is 'USER':
+        app["ipAddress"] = {
+            "discovery": {
+                "ports": [{
+                    "protocol": "tcp",
+                    "name": "test",
+                    "number": 80,
+                }]
+            }
+        }
         app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
                      '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py 80'
         app['ipAddress']['networkName'] = 'dcos'
