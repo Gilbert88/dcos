@@ -52,8 +52,7 @@ class VipTest:
                 'vipnet={},proxynet={})').format(self.container, self.vip, self.vipaddr,
                                                  self.samehost, self.vipnet, self.proxynet)
 
-    ## def log(self, s, lvl=logging.DEBUG):
-    def log(self, s, lvl=logging.INFO):
+    def log(self, s, lvl=logging.DEBUG):
         m = 'VIP_TEST {} {}'.format(s, self)
         log.log(lvl, m)
 
@@ -174,8 +173,7 @@ def vip_test(dcos_api_session, r):
 def reduce_logging():
     start_log_level = logging.getLogger('test_util.marathon').getEffectiveLevel()
     # gotta go up to warning to mute it as its currently at info
-    ## logging.getLogger('test_util.marathon').setLevel(logging.WARNING)
-    logging.getLogger('test_util.marathon').setLevel(logging.DEBUG)
+    logging.getLogger('test_util.marathon').setLevel(logging.WARNING)
     yield
     logging.getLogger('test_util.marathon').setLevel(start_log_level)
 
@@ -197,7 +195,6 @@ def test_vip(dcos_api_session, reduce_logging):
                     if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
     tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
     tests = [t for t in tests if t.container is 'UCR' and t.proxynet == 'HOST' and t.vipnet == 'HOST']
-    tests = tests[0:1]
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=maxthreads)
     # deque is thread safe
     failed_tests = deque(tests)
