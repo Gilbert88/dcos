@@ -99,6 +99,7 @@ def ucr_vip_app(network, host, vip):
             }]
         }
     }
+    app['healthChecks'] = []
     assert network is not 'BRIDGE'
     if network == 'USER':
         app['ipAddress']['networkName'] = 'dcos'
@@ -129,14 +130,11 @@ def vip_test(dcos_api_session, r):
 
     origin_app, app_uuid = vip_app(r.container, r.vipnet, host1, r.vip)
     proxy_app, _ = vip_app(r.container, r.proxynet, host2, None)
-    r.log('GOT APPS')
 
     returned_uuid = None
     with contextlib.ExitStack() as stack:
         stack.enter_context(dcos_api_session.marathon.deploy_and_cleanup(origin_app, timeout=timeout))
-        r.log('CREATED ORIGIN APP')
         sp = stack.enter_context(dcos_api_session.marathon.deploy_and_cleanup(proxy_app, timeout=timeout))
-        r.log('CREATED PROXY APP')
         cmd = '/opt/mesosphere/bin/curl -s -f -m 5 http://{}/test_uuid'.format(r.vipaddr)
         returned_uuid = ensure_routable(cmd, sp)
         log.debug('returned_uuid is: {}'.format(returned_uuid))
