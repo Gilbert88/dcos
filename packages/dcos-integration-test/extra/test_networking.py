@@ -88,33 +88,45 @@ def ucr_vip_app(network, host, vip):
     app["ipAddress"] = {
         "discovery": {
             "ports": [{
-                "protocol" :"tcp",
-                "name" : "test",
-                "number" : 80,
+                "protocol": "tcp",
+                "name": "test",
+                "number": 80,
             }]
         }
     }
-    if vip is not None:
-        app["ipAddress"]["discovery"]["ports"][0]["labels"] = { "VIP_0": vip }
-    app["portMappings"] = [{
-        "containerPort": 80,
-        "name": "http",
-        "protocol": "tcp"
-    }]
     app['healthChecks'] = [{
-            'protocol': 'MESOS_HTTP',
-            'path': '/ping',
-            'gracePeriodSeconds': 5,
-            'intervalSeconds': 10,
-            'timeoutSeconds': 10,
-            'maxConsecutiveFailures': 3,
-            'port': 80
+        'protocol': 'MESOS_HTTP',
+        'path': '/ping',
+        'gracePeriodSeconds': 5,
+        'intervalSeconds': 10,
+        'timeoutSeconds': 10,
+        'maxConsecutiveFailures': 3,
     }]
-    app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
-                 '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py 80'
     assert network is not 'BRIDGE'
-    if network == 'USER':
+    if network is 'USER':
+        app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
+                     '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py 80'
         app['ipAddress']['networkName'] = 'dcos'
+        app["portMappings"] = [{
+            "containerPort": 80,
+            "name": "http",
+            "protocol": "tcp"
+        }]
+        if vip is not None:
+            app["ipAddress"]["discovery"]["ports"][0]["labels"] = {"VIP_0": vip}
+        app['healthChecks'][0]['port'] = 80
+
+    if network is 'HOST':
+        app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
+                     '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py $PORT0'
+        app["portDefinitions"] = [{
+            "protocol": "tcp",
+            "port": 0
+        }]
+        if vip is not None:
+            app["portDefinitions"][0]["labels"] = {"VIP_0": vip}
+        app['healthChecks'][0]['portIndex'] = 0
+
     app['constraints'] = [['hostname', 'CLUSTER', host]]
     log.info("app: {}".format(json.dumps(app)))
     return app, uuid
@@ -125,7 +137,7 @@ def vip_app(container, network, host, vip):
         return ucr_vip_app(network, host, vip)
     if container == 'DOCKER':
         return docker_vip_app(network, host, vip)
-    assert False
+    assert False, "unkown container option {}".format(container)
 
 
 def vip_test(dcos_api_session, r):
@@ -175,7 +187,7 @@ def test_vip(dcos_api_session, reduce_logging):
     # tests
     # UCR doesn't support BRIDGE mode
     permutations = [[c, vi, va, sh, vn, pn]
-                    for c in ['UCR'] ## , 'DOCKER']
+                    for c in ['UCR']
                     for [vi, va] in addrs
                     for sh in [True, False]
                     for vn in ['USER', 'BRIDGE', 'HOST']
