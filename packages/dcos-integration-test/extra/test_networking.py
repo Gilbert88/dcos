@@ -48,8 +48,8 @@ class VipTest:
         self.proxynet = proxynet
 
     def __str__(self):
-        return ("VipTest(container={}, vip={},vipaddr={},samehost={},"
-                "vipnet={},proxynet={})").format(self.container, self.vip, self.vipaddr,
+        return ('VipTest(container={}, vip={},vipaddr={},samehost={},'
+                'vipnet={},proxynet={})').format(self.container, self.vip, self.vipaddr,
                                                  self.samehost, self.vipnet, self.proxynet)
 
     ## def log(self, s, lvl=logging.DEBUG):
@@ -60,7 +60,7 @@ class VipTest:
 
 def docker_vip_app(network, host, vip):
     app, uuid = get_test_app_in_docker()
-    app['id'] = '/viptest' + app['id']
+    app['id'] = '/viptest/' + app['id']
     app['container']['docker']['network'] = network
 
     app['mem'] = 16
@@ -84,7 +84,7 @@ def docker_vip_app(network, host, vip):
 
 def ucr_vip_app(network, host, vip):
     app, uuid = get_test_app_in_ucr()
-    app['id'] = '/viptest' + app['id']
+    app['id'] = '/viptest/' + app['id']
     app['mem'] = 16
     app['cpu'] = 0.01
     app['healthChecks'] = [{
@@ -97,40 +97,40 @@ def ucr_vip_app(network, host, vip):
     }]
     assert network is not 'BRIDGE'
     if network is 'USER':
-        app["ipAddress"] = {
-            "discovery": {
-                "ports": [{
-                    "protocol": "tcp",
-                    "name": "test",
-                    "number": 80,
+        app['ipAddress'] = {
+            'discovery': {
+                'ports': [{
+                    'protocol': 'tcp',
+                    'name': 'test',
+                    'number': 80,
                 }]
             }
         }
         app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
                      '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py 80'
         app['ipAddress']['networkName'] = 'dcos'
-        app["portMappings"] = [{
-            "containerPort": 80,
-            "name": "http",
-            "protocol": "tcp"
+        app['portMappings'] = [{
+            'containerPort': 80,
+            'name': 'http',
+            'protocol': 'tcp'
         }]
         if vip is not None:
-            app["ipAddress"]["discovery"]["ports"][0]["labels"] = {"VIP_0": vip}
+            app['ipAddress']['discovery']['ports'][0]['labels'] = {'VIP_0': vip}
         app['healthChecks'][0]['port'] = 80
 
     if network is 'HOST':
         app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
                      '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py $PORT0'
-        app["portDefinitions"] = [{
-            "protocol": "tcp",
-            "port": 0
+        app['portDefinitions'] = [{
+            'protocol': 'tcp',
+            'port': 0
         }]
         if vip is not None:
-            app["portDefinitions"][0]["labels"] = {"VIP_0": vip}
+            app['portDefinitions'][0]['labels'] = {'VIP_0': vip}
         app['healthChecks'][0]['portIndex'] = 0
 
     app['constraints'] = [['hostname', 'CLUSTER', host]]
-    log.info("app: {}".format(json.dumps(app)))
+    log.info('app: {}'.format(json.dumps(app)))
     return app, uuid
 
 
@@ -139,7 +139,7 @@ def vip_app(container, network, host, vip):
         return ucr_vip_app(network, host, vip)
     if container == 'DOCKER':
         return docker_vip_app(network, host, vip)
-    assert False, "unkown container option {}".format(container)
+    assert False, 'unkown container option {}'.format(container)
 
 
 def vip_test(dcos_api_session, r):
@@ -182,20 +182,21 @@ def reduce_logging():
 
 @pytest.mark.skipif(not lb_enabled(), reason='Load Balancer disabled')
 def test_vip(dcos_api_session, reduce_logging):
-    """Test every permutation of VIP
-    """
+    '''Test every permutation of VIP
+    '''
     addrs = [['1.1.1.{}:{}', '1.1.1.{}:{}'],
              ['/namedvip{}:{}', 'namedvip{}.marathon.l4lb.thisdcos.directory:{}']]
     # tests
     # UCR doesn't support BRIDGE mode
     permutations = [[c, vi, va, sh, vn, pn]
-                    for c in ['UCR']
+                    for c in ['UCR', 'DOCKER']
                     for [vi, va] in addrs
                     for sh in [True, False]
                     for vn in ['USER', 'BRIDGE', 'HOST']
                     for pn in ['USER', 'BRIDGE', 'HOST']
                     if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
     tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
+    tests = [t for t in tests if t.container is 'UCR' and t.proxynet == 'HOST' and t.vipnet == 'HOST']
     tests = tests[0:1]
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=maxthreads)
     # deque is thread safe
@@ -244,20 +245,20 @@ def test_if_overlay_ok(dcos_api_session):
 
 @pytest.mark.skipif(lb_enabled(), reason='Load Balancer enabled')
 def test_if_minuteman_disabled(dcos_api_session):
-    """Test to make sure minuteman is disabled"""
-    data = check_output(["/usr/bin/env", "ip", "rule"])
+    '''Test to make sure minuteman is disabled'''
+    data = check_output(['/usr/bin/env', 'ip', 'rule'])
     # Minuteman creates this ip rule: `9999: from 9.0.0.0/8 lookup 42`
     # We check it doesn't exist
     assert str(data).find('9999') == -1
 
 
 def test_ip_per_container(dcos_api_session):
-    """Test if we are able to connect to a task with ip-per-container mode
-    """
+    '''Test if we are able to connect to a task with ip-per-container mode
+    '''
     # Launch the test_server in ip-per-container mode
     app_definition, test_uuid = get_test_app_in_docker(ip_per_container=True)
 
-    assert len(dcos_api_session.slaves) >= 2, "IP Per Container tests require 2 private agents to work"
+    assert len(dcos_api_session.slaves) >= 2, 'IP Per Container tests require 2 private agents to work'
 
     app_definition['instances'] = 2
     app_definition['constraints'] = [['hostname', 'UNIQUE']]
@@ -281,12 +282,12 @@ def geturl(url):
 
 @pytest.mark.skipif(not lb_enabled(), reason='Load Balancer disabled')
 def test_l4lb(dcos_api_session):
-    """Test l4lb is load balancing between all the backends
+    '''Test l4lb is load balancing between all the backends
        * create 5 apps using the same VIP
        * get uuid from the VIP in parallel from many threads
        * verify that 5 uuids have been returned
        * only testing if all 5 are hit at least once
-    """
+    '''
     numapps = 5
     numthreads = numapps * 4
     apps = []
