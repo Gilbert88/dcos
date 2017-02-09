@@ -91,12 +91,11 @@ def ucr_vip_app(network, host, vip):
                 "protocol" :"tcp",
                 "name" : "test",
                 "number" : 80,
-                "labels": {
-                    "VIP_0": vip
-                }
             }]
         }
     }
+    if vip is not None:
+        app["ipAddress"]["discovery"]["ports"]["labels"] = { "VIP_0": vip }
     app["portMappings"] = [{
         "containerPort": 80,
         "name": "http",
