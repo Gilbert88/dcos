@@ -95,7 +95,7 @@ def ucr_vip_app(network, host, vip):
         }
     }
     if vip is not None:
-        app["ipAddress"]["discovery"]["ports"]["labels"] = { "VIP_0": vip }
+        app["ipAddress"]["discovery"]["ports"][0]["labels"] = { "VIP_0": vip }
     app["portMappings"] = [{
         "containerPort": 80,
         "name": "http",
