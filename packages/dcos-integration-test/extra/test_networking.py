@@ -85,25 +85,39 @@ def ucr_vip_app(network, host, vip):
     app, uuid = get_test_app_in_ucr()
     app['mem'] = 16
     app['cpu'] = 0.01
-    app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
-                 '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py $PORT0'
     app["ipAddress"] = {
         "discovery": {
             "ports": [{
                 "protocol" :"tcp",
                 "name" : "test",
-                "number" : 0,
+                "number" : 80,
                 "labels": {
                     "VIP_0": vip
                 }
             }]
         }
     }
-    app['healthChecks'] = []
+    app["portMappings"] = [{
+        "containerPort": 80,
+        "name": "http",
+        "protocol": "tcp"
+    }]
+    app['healthChecks'] = [{
+            'protocol': 'MESOS_HTTP',
+            'path': '/ping',
+            'gracePeriodSeconds': 5,
+            'intervalSeconds': 10,
+            'timeoutSeconds': 10,
+            'maxConsecutiveFailures': 3,
+            'port': 80
+    }]
+    app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
+                 '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py 80'
     assert network is not 'BRIDGE'
     if network == 'USER':
         app['ipAddress']['networkName'] = 'dcos'
     app['constraints'] = [['hostname', 'CLUSTER', host]]
+    log.info("app: {}".format(json.dumps(app)))
     return app, uuid
 
 
@@ -148,7 +162,7 @@ def reduce_logging():
     start_log_level = logging.getLogger('test_util.marathon').getEffectiveLevel()
     # gotta go up to warning to mute it as its currently at info
     ## logging.getLogger('test_util.marathon').setLevel(logging.WARNING)
-    logging.getLogger('test_util.marathon').setLevel(logging.INFO)
+    logging.getLogger('test_util.marathon').setLevel(logging.DEBUG)
     yield
     logging.getLogger('test_util.marathon').setLevel(start_log_level)
 
