@@ -41,8 +41,8 @@ def ensure_routable(cmd, service_points):
 class VipTest:
     def __init__(self, num, container, vip, vipaddr, samehost, vipnet, proxynet):
         self.vip = vip.format(num, 7000 + num)
-        self.container = container
         self.vipaddr = vipaddr.format(num, 7000 + num)
+        self.container = container
         self.samehost = samehost
         self.vipnet = vipnet
         self.proxynet = proxynet
@@ -52,7 +52,8 @@ class VipTest:
                 "vipnet={},proxynet={})").format(self.container, self.vip, self.vipaddr,
                                                  self.samehost, self.vipnet, self.proxynet)
 
-    def log(self, s, lvl=logging.DEBUG):
+    ## def log(self, s, lvl=logging.DEBUG):
+    def log(self, s, lvl=logging.INFO):
         m = 'VIP_TEST {} {}'.format(s, self)
         log.log(lvl, m)
 
@@ -84,9 +85,14 @@ def ucr_vip_app(network, host, vip):
     app, uuid = get_test_app_in_ucr()
     app['mem'] = 16
     app['cpu'] = 0.01
+    app['cmd'] = '/opt/mesosphere/bin/dcos-shell python '\
+                 '/opt/mesosphere/active/dcos-integration-test/util/python_test_server.py $PORT0'
     app["ipAddress"] = {
         "discovery": {
             "ports": [{
+                "protocol" :"tcp",
+                "name" : "test",
+                "number" : 0,
                 "labels": {
                     "VIP_0": vip
                 }
@@ -97,6 +103,7 @@ def ucr_vip_app(network, host, vip):
     if network == 'USER':
         app['ipAddress']['networkName'] = 'dcos'
     app['constraints'] = [['hostname', 'CLUSTER', host]]
+    return app, uuid
 
 
 def vip_app(container, network, host, vip):
@@ -122,11 +129,14 @@ def vip_test(dcos_api_session, r):
 
     origin_app, app_uuid = vip_app(r.container, r.vipnet, host1, r.vip)
     proxy_app, _ = vip_app(r.container, r.proxynet, host2, None)
+    r.log('GOT APPS')
 
     returned_uuid = None
     with contextlib.ExitStack() as stack:
         stack.enter_context(dcos_api_session.marathon.deploy_and_cleanup(origin_app, timeout=timeout))
+        r.log('CREATED ORIGIN APP')
         sp = stack.enter_context(dcos_api_session.marathon.deploy_and_cleanup(proxy_app, timeout=timeout))
+        r.log('CREATED PROXY APP')
         cmd = '/opt/mesosphere/bin/curl -s -f -m 5 http://{}/test_uuid'.format(r.vipaddr)
         returned_uuid = ensure_routable(cmd, sp)
         log.debug('returned_uuid is: {}'.format(returned_uuid))
@@ -139,7 +149,8 @@ def vip_test(dcos_api_session, r):
 def reduce_logging():
     start_log_level = logging.getLogger('test_util.marathon').getEffectiveLevel()
     # gotta go up to warning to mute it as its currently at info
-    logging.getLogger('test_util.marathon').setLevel(logging.WARNING)
+    ## logging.getLogger('test_util.marathon').setLevel(logging.WARNING)
+    logging.getLogger('test_util.marathon').setLevel(logging.INFO)
     yield
     logging.getLogger('test_util.marathon').setLevel(start_log_level)
 
@@ -153,14 +164,15 @@ def test_vip(dcos_api_session, reduce_logging):
     # tests
     # UCR doesn't support BRIDGE mode
     permutations = [[c, vi, va, sh, vn, pn]
-                    for c in ['UCR', 'DOCKER']
+                    for c in ['UCR'] ## , 'DOCKER']
                     for [vi, va] in addrs
                     for sh in [True, False]
                     for vn in ['USER', 'BRIDGE', 'HOST']
                     for pn in ['USER', 'BRIDGE', 'HOST']
                     if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
     tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
-    executor = concurrent.futures.ThreadPoolExecutor(workers=maxthreads)
+    tests = tests[0:1]
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=maxthreads)
     # deque is thread safe
     failed_tests = deque(tests)
     passed_tests = deque()
