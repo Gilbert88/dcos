@@ -161,6 +161,7 @@ def vip_test(dcos_api_session, r):
     with contextlib.ExitStack() as stack:
         stack.enter_context(dcos_api_session.marathon.deploy_and_cleanup(origin_app, timeout=timeout))
         sp = stack.enter_context(dcos_api_session.marathon.deploy_and_cleanup(proxy_app, timeout=timeout))
+        log.info("proxy endpoints are {}".format(sp))
         cmd = '/opt/mesosphere/bin/curl -s -f -m 5 http://{}/test_uuid'.format(r.vipaddr)
         returned_uuid = ensure_routable(cmd, sp)
         log.debug('returned_uuid is: {}'.format(returned_uuid))
@@ -194,7 +195,8 @@ def test_vip(dcos_api_session, reduce_logging):
                     for pn in ['USER', 'BRIDGE', 'HOST']
                     if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
     tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
-    tests = [t for t in tests if t.container is 'UCR' and t.proxynet == 'HOST' and t.vipnet == 'HOST']
+    # user networks do not work yet
+    tests = [t for t in tests if t.container is not 'UCR' or (t.vipnet is not 'USER' and t.proxynet is not 'USER']
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=maxthreads)
     # deque is thread safe
     failed_tests = deque(tests)
