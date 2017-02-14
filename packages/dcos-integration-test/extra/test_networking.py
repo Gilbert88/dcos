@@ -50,7 +50,7 @@ class VipTest:
 
     def __str__(self):
         return ('VipTest(container={}, vip={},vipaddr={},samehost={},'
-                'vipnet={},proxynet={, notes={})').format(self.container, self.vip, self.vipaddr, self.samehost,
+                'vipnet={},proxynet={}, notes={})').format(self.container, self.vip, self.vipaddr, self.samehost,
                                                           self.vipnet, self.proxynet, self.notes)
 
     def log(self, s, lvl=logging.DEBUG):
