@@ -46,11 +46,12 @@ class VipTest:
         self.samehost = samehost
         self.vipnet = vipnet
         self.proxynet = proxynet
+        self.notes = ""
 
     def __str__(self):
         return ('VipTest(container={}, vip={},vipaddr={},samehost={},'
-                'vipnet={},proxynet={})').format(self.container, self.vip, self.vipaddr,
-                                                 self.samehost, self.vipnet, self.proxynet)
+                'vipnet={},proxynet={, notes={})').format(self.container, self.vip, self.vipaddr, self.samehost,
+                                                          self.vipnet, self.proxynet, self.notes)
 
     def log(self, s, lvl=logging.DEBUG):
         m = 'VIP_TEST {} {}'.format(s, self)
@@ -81,8 +82,13 @@ def docker_vip_app(network, host, vip):
     return app, uuid
 
 
-def ucr_vip_app(network, host, vip):
-    app, uuid = get_test_app_in_ucr()
+def mesos_vip_app(network, host, vip, ucr=False):
+    app = None
+    uuid = None
+    if ucr is False:
+        app, uuid = get_test_app()
+    else:
+        app, uuid = get_test_app_in_ucr()
     app['id'] = '/viptest/' + app['id']
     app['mem'] = 16
     app['cpu'] = 0.01
@@ -135,9 +141,11 @@ def ucr_vip_app(network, host, vip):
 
 def vip_app(container, network, host, vip):
     if container == 'UCR':
-        return ucr_vip_app(network, host, vip)
+        return mesos_vip_app(network, host, vip, ucr=True)
     if container == 'DOCKER':
         return docker_vip_app(network, host, vip)
+    if container == 'NONE':
+        return mesos_vip_app(network, host, vip, ucr=False)
     assert False, 'unkown container option {}'.format(container)
 
 
@@ -188,24 +196,30 @@ def test_vip(dcos_api_session, reduce_logging):
     # tests
     # UCR doesn't support BRIDGE mode
     permutations = [[c, vi, va, sh, vn, pn]
-                    for c in ['UCR', 'DOCKER']
+                    for c in ['NONE', 'UCR', 'DOCKER']
                     for [vi, va] in addrs
                     for sh in [True, False]
                     for vn in ['USER', 'BRIDGE', 'HOST']
-                    for pn in ['USER', 'BRIDGE', 'HOST']
-                    if c is not 'UCR' or (vn is not 'BRIDGE' and pn is not 'BRIDGE')]
+                    for pn in ['USER', 'BRIDGE', 'HOST']]
     tests = [VipTest(i, c, vi, va, sh, vn, pn) for i, [c, vi, va, sh, vn, pn] in enumerate(permutations)]
-    # user networks do not work yet
-    # waiting for https://github.com/mesosphere/marathon/issues/5110
-    tests = [t for t in tests if t.container is not 'UCR' or (t.vipnet is not 'USER' and t.proxynet is not 'USER')]
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=maxthreads)
     # deque is thread safe
     failed_tests = deque(tests)
     passed_tests = deque()
     skipped_tests = deque()
-    # skip tests there are not enough agents to run them
+    # skip certain tests
     for r in tests:
+        if r.container is 'UCR' or r.container is 'NONE':
+            if r.vipnet is 'USER' or r.proxynet is 'USER':
+                r.notes = "waiting on https://github.com/mesosphere/marathon/issues/5110"
+                failed_tests.remove(r)
+                skipped_tests.append(r)
+            if r.vipnet is 'BRIDGE' or r.proxynet is 'BRIDGE':
+                r.notes = "bridge networks are not supported by mesos runtime"
+                failed_tests.remove(r)
+                skipped_tests.append(r)
         if not r.samehost and len(dcos_api_session.slaves) == 1:
+            r.notes = "needs more then 1 agent to run"
             failed_tests.remove(r)
             skipped_tests.append(r)
 
