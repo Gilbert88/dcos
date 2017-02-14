@@ -218,6 +218,35 @@ class VpcClusterUpgradeTest:
         # TODO(branden): We ought to be able to deploy these apps concurrently. See
         # https://mesosphere.atlassian.net/browse/DCOS-13360.
         with logger.scope("deploy apps"):
+            viplisten = {
+                "id": '/' + TEST_APP_NAME_FMT.format('viplisten-' + uuid.uuid4().hex),
+                "cmd": "/opt/mesosphere/bin/toybox nc -l -p $PORT0",
+                "cpus": 0.1,
+                "mem": 32,
+                "instances": 1,
+                'portDefinitions': [{
+                    'labels': {
+                        'VIP_0': '/viplisten:5000'
+                    }
+                }]
+            }
+            viptalk = {
+                "id": '/' + TEST_APP_NAME_FMT.format('viptalk-' + uuid.uuid4().hex),
+                "cmd": "ncat viplisten.marathon.l4lb.thisdcos.directory 5000 < /dev/zero",
+                "cpus": 0.1,
+                "mem": 32,
+                "instances": 1,
+                "container": {
+                    "type": "MESOS",
+                    "image": "multicloud/netcat"
+                }
+            }
+            cluster_api.marathon.deploy_app(viplisten)
+            cluster_api.marathon.ensure_deployments_complete()
+            cluster_api.marathon.deploy_app(viptalk)
+            cluster_api.marathon.ensure_deployments_complete()
+
+
             dcos_api.marathon.deploy_app(healthcheck_app)
             dcos_api.marathon.ensure_deployments_complete()
             # This is a hack to make sure we don't deploy dns_app before the name it's
@@ -226,7 +255,7 @@ class VpcClusterUpgradeTest:
             dcos_api.marathon.deploy_app(dns_app, check_health=False)
             dcos_api.marathon.ensure_deployments_complete()
 
-            test_apps = [healthcheck_app, dns_app]
+            test_apps = [healthcheck_app, dns_app, viplisten, viptalk]
             self.test_app_ids = [app['id'] for app in test_apps]
 
             self.tasks_start = {app_id: sorted(self.app_task_ids(dcos_api, app_id)) for app_id in self.test_app_ids}
