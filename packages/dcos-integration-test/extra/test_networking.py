@@ -214,10 +214,12 @@ def test_vip(dcos_api_session, reduce_logging):
                 r.notes = "waiting on https://github.com/mesosphere/marathon/issues/5110"
                 failed_tests.remove(r)
                 skipped_tests.append(r)
+                continue
             if r.vipnet is 'BRIDGE' or r.proxynet is 'BRIDGE':
                 r.notes = "bridge networks are not supported by mesos runtime"
                 failed_tests.remove(r)
                 skipped_tests.append(r)
+                continue
         if not r.samehost and len(dcos_api_session.slaves) == 1:
             r.notes = "needs more then 1 agent to run"
             failed_tests.remove(r)
